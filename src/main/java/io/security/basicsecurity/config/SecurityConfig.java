@@ -16,22 +16,17 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http.authorizeHttpRequests()
                 .anyRequest().authenticated();
-        http.formLogin()
-//                .loginPage("/loginPage")
-                .defaultSuccessUrl("/")
-                .failureUrl("/login")
-                .usernameParameter("userId")
-                .passwordParameter("passwd")
-                .loginProcessingUrl("/login_proc")
-                .successHandler((request, response, authentication) -> {
-                    log.info("authentication " + authentication.getName());
-                    response.sendRedirect("/");
+        http.formLogin();
+        http.logout()
+                .logoutUrl("/logout")
+                .logoutSuccessUrl("/login")
+                .addLogoutHandler((request, response, authentication) -> {
+                    request.getSession().invalidate();
                 })
-                .failureHandler((request, response, exception) -> {
-                    log.error("exception " + exception.getMessage());
+                .logoutSuccessHandler((request, response, authentication) -> {
                     response.sendRedirect("/login");
                 })
-                .permitAll();
+                .deleteCookies("remember-me");
 
         return http.build();
     }
