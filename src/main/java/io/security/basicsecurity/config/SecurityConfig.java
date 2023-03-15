@@ -10,8 +10,9 @@ import org.springframework.security.config.annotation.web.configurers.SessionMan
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
-
-import static org.springframework.security.config.Customizer.withDefaults;
+import org.springframework.security.web.savedrequest.HttpSessionRequestCache;
+import org.springframework.security.web.savedrequest.RequestCache;
+import org.springframework.security.web.savedrequest.SavedRequest;
 
 @Slf4j
 @RequiredArgsConstructor
@@ -24,12 +25,30 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http.authorizeHttpRequests(auth ->
-                        auth.requestMatchers("/user").hasRole("USER")
+                        auth.requestMatchers("/login").permitAll()
+                                .requestMatchers("/user").hasRole("USER")
                                 .requestMatchers("/admin/pay").hasRole("ADMIN")
                                 .requestMatchers("/admin/**").access(new WebExpressionAuthorizationManager("hasRole('ADMIN') or hasRole('SYS')"))
                                 .anyRequest().authenticated()
                 )
-                .formLogin(withDefaults())
+                .formLogin(handler ->
+                        handler.successHandler((request, response, authentication) -> {
+                                    RequestCache requestCache = new HttpSessionRequestCache();
+                                    SavedRequest savedRequest = requestCache.getRequest(request, response);
+                                    String redirectUrl = savedRequest.getRedirectUrl();
+                                    response.sendRedirect(redirectUrl);
+                                }
+                        )
+                )
+                .exceptionHandling(handler ->
+                        handler
+//                                .authenticationEntryPoint((request, response, authException) ->
+//                                        response.sendRedirect("/login")
+//                                )
+                                .accessDeniedHandler((request, response, accessDeniedException) ->
+                                        response.sendRedirect("/denied")
+                                )
+                )
                 .logout(logout ->
                         logout.logoutUrl("/logout")
                                 .logoutSuccessUrl("/login")
