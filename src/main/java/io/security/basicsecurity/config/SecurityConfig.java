@@ -6,6 +6,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+ import org.springframework.security.config.annotation.web.configurers.SessionManagementConfigurer.SessionFixationConfigurer;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.SecurityFilterChain;
 
@@ -29,13 +30,22 @@ public class SecurityConfig {
                         logout.logoutUrl("/logout")
                                 .logoutSuccessUrl("/login")
                                 .addLogoutHandler((request, response, authentication) ->
-                                        request.getSession().invalidate())
+                                        request.getSession().invalidate()
+                                )
                                 .logoutSuccessHandler((request, response, authentication) ->
-                                        response.sendRedirect("/login")))
+                                        response.sendRedirect("/login")
+                                )
+                )
                 .rememberMe(remember ->
                         remember.rememberMeParameter("remember")
                                 .tokenValiditySeconds(3600)
                                 .userDetailsService(userDetailsService))
+                .sessionManagement(session ->
+                        session.sessionFixation(SessionFixationConfigurer::changeSessionId)
+                                .maximumSessions(1)
+                                .maxSessionsPreventsLogin(true)
+
+                )
                 .build();
     }
 }
