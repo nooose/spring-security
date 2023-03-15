@@ -6,9 +6,10 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
- import org.springframework.security.config.annotation.web.configurers.SessionManagementConfigurer.SessionFixationConfigurer;
+import org.springframework.security.config.annotation.web.configurers.SessionManagementConfigurer.SessionFixationConfigurer;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.expression.WebExpressionAuthorizationManager;
 
 import static org.springframework.security.config.Customizer.withDefaults;
 
@@ -23,8 +24,11 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http.authorizeHttpRequests(auth ->
-                        auth.anyRequest()
-                                .authenticated())
+                        auth.requestMatchers("/user").hasRole("USER")
+                                .requestMatchers("/admin/pay").hasRole("ADMIN")
+                                .requestMatchers("/admin/**").access(new WebExpressionAuthorizationManager("hasRole('ADMIN') or hasRole('SYS')"))
+                                .anyRequest().authenticated()
+                )
                 .formLogin(withDefaults())
                 .logout(logout ->
                         logout.logoutUrl("/logout")
@@ -44,7 +48,6 @@ public class SecurityConfig {
                         session.sessionFixation(SessionFixationConfigurer::changeSessionId)
                                 .maximumSessions(1)
                                 .maxSessionsPreventsLogin(true)
-
                 )
                 .build();
     }
