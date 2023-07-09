@@ -111,3 +111,121 @@ class DefaultWebSecurityCondition extends AllNestedConditions {
 > 
 > CORS 예비 요청과 단순 및 본 요청을 가로채고, 제공된 CorsConfigurationSource를 통해 일치된 정책에 따라 CORS 응답 헤더와 같은 응답을 업데이트하기 위한 필터 
 
+---
+
+# OAuth2
+**OAuth** = **Open** + **Auth**orization
+
+- OAuth 2.0 인가 프레임워크는 애플리케이션이 사용자를 대신하여 사용자의 자원에 대한 제한된 액세스를 얻기 위해 승인 상호 작용을 함으로써 애플리케이션이 자체적으로 액세스 권한을 얻도록 한다.
+- 사용자가 속한 사이트의 보호된 자원에 대하여 애플리케이션의 접근을 허용하도록 승인하는 것을 의미
+```mermaid
+sequenceDiagram
+    autonumber
+    Actor O as Resource Owner
+    participant C as Client
+    participant S as Authorization & Resource Server
+
+    O->>C: 서비스 이용(Resource) 요청
+    C->>S: Resource 액세스 요청
+    S-->>C: 로그인 Redirect URL 제공
+    C-->>O: 로그인 Redirect URL 제공
+    O->>S: 해당 URL로 로그인 요청
+    S-->>C: Resource에 접근이 가능한 Access Token 발급
+    C->>S: Access Token을 사용해서 Resource 요청
+    S->>S: access token 검증
+    S-->>C: Resource
+    C-->>O: Resource 제공
+```
+
+## OAuth 2.0 Rolse
+다음 4가지 종류의 역할을 담당하는 주체들에 의해 이루어지는 권한부여 체계
+1. Resource Owner (자원 소유자)
+  - 보호된 자원에 대한 접근 권한을 부여할 수 있는 주체, 사용자로서 계정의 일부에 대한 접근 권한을 부여하는 사람
+  - 사용자를 대신하여 작동하려는 모든 클라이언트는 먼저 사용자의 허가를 받아야한다.
+1. Resource Server (보호 자원서버)
+  - 타사 애플리케이션에서 접근하는 사용자의 자원이 포함된 서버를 의미
+  - 액세스 토큰을 수락 및 검증할 수 있어야 하며 권한 체계에 따라 요청을 승인할 수 있어야 한다.
+1. Authorization Server (인가 서버)
+  - 클라이언트가 사용자 계정에 대한 동의 및 접근을 요청할 때 상호 작용하는 서버로서 클라이언트의 권한 부여 요청을 승인하거나 거부하는 서버
+  - 사용자가 클라이언트에게 권한 부여 요청을 승인한 후 access token을 클라이언트에게 부여하는 역할
+  - ex) Keycloak, Spring Authorization Server, Okta
+1. Client (클라이언트)
+  - 사용자를 대신하여 권한을 부여받아 사용자의 리소스에 접근하려는 애플리케이션
+  - 사용자를 권한 부여 서버로 안내하거나 사용자의 상호 작용 없이 권한 부여 서버로부터 직접 권한을 얻을 수 있다.
+
+## Keycloak
+ID 및 접근 관리를 지원하는 인가서버 오픈 소스로 사용자 연합, 강력한 인증, 사용자 관리, 세분화된 권한 부여 등을 제공
+- 해당 프로젝트에서 OAuth2 실습 시 인가 서버 목적으로 사용
+- [다운로드](https://www.keycloak.org/downloads)
+
+```bash
+# 공개 클라이언트 (Implicit Flow 활성화)
+curl --location --request GET "http://$KEYCLOAK_ADDRESS/realms/$REALM/protocol/openid-connect/auth?response_type=token&client_id=$CLIENT_ID&scope=profile%20email&redirect_uri=$CLIENT_ADDRESS"
+
+
+# 리소스 요청을 위한 인증 및 코드 요청 - 기밀 클라언트
+curl --location --request GET "http://$KEYCLOAK_ADDRESS/realms/$REALM/protocol/openid-connect/auth?response_type=code&client_id=$CLIENT_ID&scope=profile%20email&redirect_uri=$CLIENT_ADDRESS"
+
+# 해당 코드를 사용하여 토큰 요청 - 기밀 클라언트
+curl --location --request POST "http://$KEYCLOAK_ADDRESS/realms/$REALM/protocol/openid-connect/token" \
+--header 'Content-Type: application/x-www-form-urlencoded' \
+--data-urlencode 'grant_type=authorization_code' \
+--data-urlencode "client_id=$CLIENT_ID" \
+--data-urlencode "client_secret=$CLIENT_SECRET" \
+--data-urlencode "redirect_uri=$CLIENT_ADDRESS" \
+--data-urlencode "code=$CODE"
+
+# 토큰을 사용하여 리소스 요청 - 기밀 클라언트
+curl --location --request GET "http://$KEYCLOAK_ADDRESS/realms/$REALM/protocol/openid-connect/userinfo" \
+--header "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+## OAuth 2.0 Cient Types
+- 인증 서버에 클라이언트를 등록할 때 클라이언트 자격 증명인 클라이언트 아이디와 암호를 받는다.
+- 클라이언트 암호는 비밀이고 그대로 유지되어야 하는 반면 클라이언트 아이디는 공개이다.
+- 이 자격 증명은 인증 서버에 대한 클라이언트 ID를 증명한다.
+
+### 공개 클라이언트 (Public Clients)
+- 공개 클라이언트는 client_secret의 기밀을 유지할 수 없으므로 이러한 앱에는 secret이 사용되지 않는다.
+  - 브라우저(SPA)에서 실행되는 JavaScript 애플리케이션, Android 또는 IOS 모바일 앱, 데스크톱에서 실행되는 기본 앱, IoT/임베디드 장치에서 실행되는 애플리케이션 등
+  - 개발자 도구나 디버깅 도구를 사용하여 바이너리/실행 코드에서 기밀 정보룰 추출할 수 있음
+  - 서버측이 아닌 리소스 소유자가 사용하는 장치에서 실행되는 모든 클라이언트는 공개 클라이언트로 간주되어야 함
+```mermaid
+sequenceDiagram
+    title Public
+    autonumber
+    participant C as Client
+    participant S as Authorization Server
+
+    rect rgb(255, 223, 255)
+    note over C, S: front channl
+    C->>S: request authorization
+    S-->>C: access token
+    end
+    rect rgb(180, 223, 255)
+    note over C, S: back channl
+    end
+```
+
+### 기밀 클라이언트 (Confidential Clients)
+- 기밀 클라이언트는 client_secret의 기밀성을 유지할 수 있는 클라이언트를 의미
+  - 일반적으로 사용자가 소스 코드에 액세스할 수 없는 서버에서 실행되는 응용 프로그램으로 Java, PHP 및 Node.js 같은 서버 측 언어로 작성
+  - 이러한 유형의 애플리케이션은 대부분 웹 서버에서 실행되기 때문에 일반적으로 `웹 앱`이라고 한다.
+```mermaid
+sequenceDiagram
+    title Confidential
+    autonumber
+    participant C as Client
+    participant S as Authorization Server
+
+    rect rgb(255, 223, 255)
+    note over C, S: front channl
+    C->>+S: request authorization
+    S-->>C: redirect with code
+    end
+    rect rgb(180, 223, 255)
+    note over C, S: back channl
+    C->>S: send code
+    S-->>C: access token
+    end
+```
