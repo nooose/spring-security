@@ -126,15 +126,18 @@ sequenceDiagram
     participant S as Authorization & Resource Server
 
     O->>C: 서비스 이용(Resource) 요청
-    C->>S: Resource 액세스 요청
-    S-->>C: 로그인 Redirect URL 제공
-    C-->>O: 로그인 Redirect URL 제공
-    O->>S: 해당 URL로 로그인 요청
+    C->>S: Resource 액세스 요청 (권한부여 코드 요청)
+    S-->>O: 로그인 페이지
+    O->>S: 로그인
+    S-->>O: 로그인 성공(Consent) 후 Redirect with code
+    O->>C: Redirect with code
+    C->>S: Code를 사용하여 Access Token 요청
+    S->>S: code 검증
     S-->>C: Resource에 접근이 가능한 Access Token 발급
     C->>S: Access Token을 사용해서 Resource 요청
     S->>S: access token 검증
     S-->>C: Resource
-    C-->>O: Resource 제공
+    C-->>O: Resource
 ```
 
 ## OAuth 2.0 Rolse
@@ -180,7 +183,7 @@ curl --location --request GET "http://$KEYCLOAK_ADDRESS/realms/$REALM/protocol/o
 --header "Authorization: Bearer $ACCESS_TOKEN"
 ```
 
-## OAuth 2.0 Cient Types
+## OAuth 2.0 Client Types
 - 인증 서버에 클라이언트를 등록할 때 클라이언트 자격 증명인 클라이언트 아이디와 암호를 받는다.
 - 클라이언트 암호는 비밀이고 그대로 유지되어야 하는 반면 클라이언트 아이디는 공개이다.
 - 이 자격 증명은 인증 서버에 대한 클라이언트 ID를 증명한다.
@@ -198,12 +201,12 @@ sequenceDiagram
     participant S as Authorization Server
 
     rect rgb(255, 223, 255)
-    note over C, S: front channl
+    note over C, S: front channel
     C->>S: request authorization
     S-->>C: access token
     end
     rect rgb(180, 223, 255)
-    note over C, S: back channl
+    note over C, S: back channel
     end
 ```
 
@@ -219,13 +222,104 @@ sequenceDiagram
     participant S as Authorization Server
 
     rect rgb(255, 223, 255)
-    note over C, S: front channl
+    note over C, S: front channel
     C->>+S: request authorization
     S-->>C: redirect with code
     end
     rect rgb(180, 223, 255)
-    note over C, S: back channl
+    note over C, S: back channel
     C->>S: send code
     S-->>C: access token
     end
 ```
+
+## OAuth 2.0 Token Types
+1. Access Token
+    - 클라이언트에서 사용자의 **보호된 리소스에 접근하기 위해 사용하는 일종의 자격 증명**으로서 역할을 하며 리소스 소유자가 클라이언트에게 부여한 권한
+    - 일반적으로 JWT 형식을 취하지만 사양에 따라 그럴 필요는 없다.
+    - 토큰에는 해당 엑세스 기간, 범위 및 서버에 필요한 기타 정보가 있다.
+    - 타입에는 *식별자* *타입*(Identifier Type)과 *자체* *포함타입*(Self-contained Type)이 있다.
+1. Refresh Token
+   - **액세스 토큰이 만료된 후 새 엑세스 토큰을 얻기 위해 클라이언트 응용 프로그램에서 사용하는 자격 증명**
+   - 액세스 토큰이 만료되는 경우 클라이언트는 권한 부여 서버로 인증하고 Refresh Token을 전달한다.
+   - 인증 서버는 Refresh Token의 유효성을 검사하고 새 액세스 토큰을 발급한다.
+   - Refresh Token은 액세스 토큰과 달리 권한 서버 토큰 엔드포인트에만 보내지고 리소스 서버에는 보내지 않는다.
+1. ID Token
+   - OpenID connect
+1. Authorization Code
+   - **권한 부여 코드 흐름에서 사용**
+   - **클라이언트가 액세스 토큰과 교환할 임시 코드**
+   - 인가 서버로부터 리다이렉트 되어 받아온다.
+
+
+**식별자 타입**
+
+| access token     | username | scope              | expires_in |
+|------------------|----------|--------------------|------------|
+| dor27tptmxhzms77 | noose    | email, read, write | 123456789  |
+| ...              | ...      | ...                | ...        |
+
+**자체 포함 타입**
+- JWT
+  - 특정 암호화 알고리즘을 사용하여 개인키로 서명되고 공개키로 검증할 수 있으며 만료될 때까지 유효
+
+## OAuth 2.0 Grant Types
+권한 부여란 클라이언트가 사용자를 대신해서 사용자의 승인하에 인가서버로부터 권한을 부여받는 것
+
+- Authorization Code Grant Type
+  - 서버 사이드 애플리케이션
+  - 보안에 가장 안전한 유형
+- Implicit Grant Type **(Deprecated)**
+  - 공개 클라이언트 애플리케이션에서 사용
+  - 토큰이 브라우저에 노출 ➡ 보안에 취약
+- Resource Owner Password Credentials Grant Type **(Deprecated)**
+  - 리소스 사용자 비밀번호 자격증명 부여 타입
+  - 클라이언트가 사용자의 자격증명을 모두 읽을 수 있음
+- Client Credentials Grant Type
+  - Secret 값만 있다면 인증이 가능
+  - 화면이 없는 서버 애플리케이션 (데몬)
+- Refresh Token Grant TYpe
+- PKCE-enhanced Authorization Code Grant Type
+  - Authorization Code Grant Type에서 파라미터가 추가됨
+    - 값은 해시된 데이터
+
+### 매개 변수 용어
+- `client_id`: 인가 서버에 등록된 클라이언트에 대해 생성된 고유 키
+- `client_secret`: 인가 서버에 등록된 특정 클라이언트의 client_id에 대해 생성된 비밀 값
+- `response_type`
+  - 애플리케이션이 권한 부여 코드 흐름을 시작하고 있음을 인증 서버에 알려준다.
+  - code, token, id_token이 있으며 token, id_token은 implict 권한 부여 유형에서 지원해야함
+  - 서버가 query string에 인증 코드(code), 토큰(token, id_token) 등을 반환
+- `grant_type`: 권한 부여 타입 지정
+  - authorization_code
+  - password
+  - client_credentials
+  - refresh_token
+- `redirect_uri`
+  - 사용자가 성공적으로 승인되면 권한 부여 서버가 사용자를 다시 응용 프로그램으로 리다이렉션
+  - 토큰 요청의 redirect_uri는 인증 코드를 생성할 때 사용된 redirect_uri와 정확히 일치해야 한다.
+- `scope`
+  - 애플리케이션이 사용자 데이터에 접근하는 것을 제한하기 위해 사용됨
+  - 사용자에 의해 특정 스코프로 제한된 권한 인가권을 발행함으로써 데이터 접근을 제한
+- `state`
+  - 응용 프로그은 임의의 문자열을 생성하고 요청에 포함하고 사용자가 앱을 승인한 후 서버로부터 동일한 값이 반환되는지 확인해야 함
+  - 이것은 CSRF 공격을 방지하는 데 사용
+
+## Authorization Code Grant
+1. 사용자가 애플리케이션을 승인하면 인가서버는 Redirect URI로 임시 코드를 담아서 애플리케이션으로 다시 리다이렉트한다.
+2. 애플리케이션은 해당 임시 코드를 인가서버로 전달하고 액세스 토큰으로 교환한다.
+3. 애플리케이션이 액세스 토큰을 요청할 때 요청을 클라이언트 암호로 인증할 수 있으므로 공격자가 인증 코드를 가로채서 스스로 사용할 위험이 줄어듬
+4. 액세스 토큰이 사용자 또는 브라우저에 표시되지 않고 애플리케이션에 다시 전달하는 가장 안전한 방법이므로 토큰이 다른 사람에게 누출된 위험이 줄어듬
+
+- 권한 부여 코드 요청 시 매개변수
+  - response_type=code (필수)
+  - client_id (필수)
+  - redirect_uri (선택)
+  - scope (선택)
+  - state (선택)
+- 액세스 토큰 교환 요청 시 매개변수
+  - grant_type=authorization_code (필수)
+  - code (필수)
+  - redirect_uri (필수)
+  - client_id (필수)
+  - client_secret (필수)
