@@ -305,21 +305,74 @@ sequenceDiagram
   - 응용 프로그은 임의의 문자열을 생성하고 요청에 포함하고 사용자가 앱을 승인한 후 서버로부터 동일한 값이 반환되는지 확인해야 함
   - 이것은 CSRF 공격을 방지하는 데 사용
 
-## Authorization Code Grant
+### Authorization Code Grant
 1. 사용자가 애플리케이션을 승인하면 인가서버는 Redirect URI로 임시 코드를 담아서 애플리케이션으로 다시 리다이렉트한다.
 2. 애플리케이션은 해당 임시 코드를 인가서버로 전달하고 액세스 토큰으로 교환한다.
 3. 애플리케이션이 액세스 토큰을 요청할 때 요청을 클라이언트 암호로 인증할 수 있으므로 공격자가 인증 코드를 가로채서 스스로 사용할 위험이 줄어듬
 4. 액세스 토큰이 사용자 또는 브라우저에 표시되지 않고 애플리케이션에 다시 전달하는 가장 안전한 방법이므로 토큰이 다른 사람에게 누출된 위험이 줄어듬
 
-- 권한 부여 코드 요청 시 매개변수
-  - response_type=code (필수)
-  - client_id (필수)
-  - redirect_uri (선택)
-  - scope (선택)
-  - state (선택)
-- 액세스 토큰 교환 요청 시 매개변수
-  - grant_type=authorization_code (필수)
-  - code (필수)
-  - redirect_uri (필수)
-  - client_id (필수)
-  - client_secret (필수)
+**권한 부여 코드 요청 시 매개변수**
+- response_type=code (필수)
+- client_id (필수)
+- redirect_uri (선택)
+- scope (선택)
+- state (선택)
+
+**액세스 토큰 교환 요청 시 매개변수**
+- grant_type=authorization_code (필수)
+- code (필수)
+- redirect_uri (필수)
+- client_id (필수)
+- client_secret (필수)
+
+### Implicit Grant
+- 브라우저는 서비스에 직접 API 요청
+- 코드 교환 단계를 건너뛰고 대신 액세스 토큰이 쿼리 문자열 조각으로 클라이언트에 즉시 반환
+- back channel이 없으므로 refresh token을 사용하지 못함
+- 토큰 만료 시 애플리케이션이 새로운 access token을 얻으려면 다시 OAuth 승인 과정을 거쳐야 함
+
+**권한 부여 승인 요청 시 매개변수**
+- response_type=token (필수), id_token
+- client_id (필수)
+- redirect_uri (선택)
+- scope (선택)
+- state (선택)
+
+### Resource Owner Password Credentials Grant
+- 애플리케이션이 사용자 이름과 암호를 액세스 토큰으로 교환할 때 사용된다.
+- 타사 애플리케이션이 이 권한을 사용하도록 허용해서는 안 되고 고도의 신뢰할 자사 애플리케이션에서만 사용해야 한다.
+
+**권한 부여 승인 요청 시 매개변수**
+- grant_type=password (필수)
+- username (필수)
+- password (필수)
+- client_id (필수)
+- client_secret (필수)
+- scope (선택)
+
+### Client Credentials Grant
+- 애플리케이션이 리소스 소유자인 동시에 클라이언트의 역할을 한다.
+- 리소스 소유자에게 권한 위임을 받아 리소스에 접근하는 것이 아니라 자기 자신이 애플리케이션을 사용할 목적으로 사용하는 것
+- 서버 대 서버간의 통신에서 사용할 수 있으며 IoT와 같은 장비 애플리케이션과 통신을 위한 인증으로도 사용할 수 있다.
+- Client Id와 Client Secret을 통해 액세스 토큰을 바로 발급 받을 수 있기 때문에 Refresh Token을 제공하지 않는다.
+- Client 정보를 기반으로 하기 때문에 사용자 정보를 제공하지 않는다.
+
+**권한 부여 승인 요청 시 매개변수**
+- grant_type=password (필수)
+- client_id (필수)
+- client_secret (필수)
+- scope (선택)
+
+### Refresh Token Grant
+- 액세스 토큰이 발급될 때 함께 제공되는 토큰으로서 액세스 토큰이 만료되더라도 함께 발급받았던 리프레시 토큰이 유효하다면, 인증 과정을 처음부터 반복하지 않아도 액세스 토큰을 재발급 받을 수 있다.
+- 한 번 사용된 refresh token은 폐기되거나 재사용할 수 있다.
+
+**권한 부여 승인 요청 시 매개변수**
+- grant_type=refresh_token (필수)
+- refresh_token
+- client_id (필수)
+- client_secret (필수)
+
+### PKCE(Proof Key for Code Exchange)
+- 코드 교환을 위한 증명 키로써 CSRF 및 권한부여 코드 삽입 공격을 방지하기 위한 Authorization Code Grant Flow의 확장버전이다.
+- Authorization Code가 탈취당했을 때 Access Token을 발급하지 못하도록 차단한다.
