@@ -376,3 +376,95 @@ sequenceDiagram
 ### PKCE(Proof Key for Code Exchange)
 - 코드 교환을 위한 증명 키로써 CSRF 및 권한부여 코드 삽입 공격을 방지하기 위한 Authorization Code Grant Flow의 확장버전이다.
 - Authorization Code가 탈취당했을 때 Access Token을 발급하지 못하도록 차단한다.
+
+# OAuth 2.0 Open ID Connect (OIDC)
+OAuth 2.0 프로토콜 위에 구축된 ID 계층으로 OAuth 2.0을 확장하여 인증 방식을 표준화 한 **OAuth 2.0 기반의 인증 프로토콜**이다.
+> OAuth 2.0은 인증이 아닌 인가 기술이다.
+
+## ID Token
+- ID 토큰은 사용자가 인증 되었음을 증명하는 결과물로서 OIDC 요청 시 access token과 함께 클라이언트에게 전달되는 토큰이다.
+- ID 토큰은 JWT으로 표현된다.
+- ID 토큰은 인증서버의 개인 키로 발급자가 서명하는 것으로서 토큰의 출처를 보장하고 변조되지 않았음을 보장한다.
+- 애플리케이션(클라이언트)은 공개 키로 ID 토큰을 검증 및 유효성을 검사하고 만료여부 등 토큰의 클레임을 확인한다.
+- 클라이언트는 클레임 정보에 포함되어 있는 사용자명, 이메일을 활용하여 인증 관리를 할 수 있다
+
+## ID Token vs Access Token
+- ID Token은 API 요청에 사용해서는 안 되며 사용자의 신원확인을 위해 사용되어야한다.
+- Access Token은 인증을 위해 사용해서는 안 되며 리소스에 접근하기 위해 사용되어져야 한다.
+
+## OIDC Scope
+- openid (필수): 클라이언트가 OpenID Connect 요청을 하고 있음을 알린다.
+- profile: 기본 프로필 클레임에 대한 액세스 요청
+- email
+- address
+- phone
+
+## OIDC 로그인 요청
+### OIDC 상호 작용 행위자
+- OpenID Provider
+  - 줄여서 OP라고 하며 OpenID 제공자로서 최종 사용자를 인증하고 인증 결과와 사용자에 대한 정보를 신뢰 당사자(클라이언트)에게 제공할 수 있는 OAuth 2.0 서버를 의미한다.
+- Relying Party
+  - 줄여서 RP라고 하며 신뢰 당사자로서 인증 요청을 처리하기 위해 OP에 의존하는 OAuth 2.0 애플리케이션을 의미
+
+**흐름**
+1. RP는 OP에 권한 부여 요청을 보낸다.
+2. OP는 최종 사용자를 인증하고 권한을 얻는다.
+3. OP는 ID 토큰과 액세스 토큰으로 응답한다.
+4. RP는 Access Token을 사용하여 UserInfo 엔드포인트에 요청을 보낼 수 있다.
+5. UserInfo 엔드포인트는 최종 사용자에 대한 클레임을 반환한다.
+
+- 매개변수 요청 및 응답
+  - 요청 시 openid 범위를 scope 매개 변수에 포함해야함
+  - response_type 매개 변수는 id_token을 포함한다.
+  - 요청은 nonce 매개 변수를 포함해야 한다. (implicit Flow인 경우 필수)
+
+# OAuth 2.0 Client
+OAuth 2.0 인가 프레임워크 역할 중 인가서버 및 리소스 서버와의 통신을 담당하는 클라이언트의 기능을 필터 기반으로 구현한 모듈
+
+- OAuth 2.0 Login
+  - 애플리케이션의 사용자를 외부 OAuth 2.0 Provider나 OpenID Connect 1.0 Provider 계정으로 로그인할 수 있는 기능을 제공
+  - 글로벌 서비스 Provider인 '구글 계정으로 로그인', '깃허브 계정으로 로그인' 기능을 OAuth 2.0 로그인을 구현해 사용할 수 있도록 지원
+  - OAuth 2.0 인가 프레임워크의 권한 부여 유형 중 Authorization Code 방식을 사용한다.
+- OAuth 2.0 Client
+  - OAuth 2.0 인가 프레임워크에 정의된 클라이언트 역할을 지원한다.
+  - 인가 서버의 권한 부여 유형에 따른 엔드 포인트와 직접 통신할 수 있는 API를 제공한다.
+
+## 클라이언트 권한 부여 요청 시작
+1. 클라이언트가 인가서버로 권한 부여 요청을 하거나 토큰 요청을 할 경우 클라이언트 정보 및 엔드포인트 정보를 참조해서 전달한다.
+2. `application.yaml` 파일에 클라이언트 설정과 인가서버 엔드포인트 설정을 한다.
+3. 초기화가 진행되면 설정 정보가 OAuth2ClientProperties에 바인딩 된다.
+4. 해당 설정 값이 인가서버로 권한 부여 요청을 하기 위한 ClientRegistration 클래스 필드에 저장된다.
+5. OAuth2Client는 ClientRegistraion을 참조해서 권한 부여 요청을 위한 매개변수를 구성하고 인가서버와 통신한다.
+
+```yaml
+spring:
+  security:
+    oauth2:
+      client: # 클라이언트 설정
+        registration: 
+          keycloak:
+            authorization-grant-type: authorization_code          # OAuth 2.0 권한 부여 타입
+            client-id: oauth2-client-app                          # 서비스 공급자에 등록된 클라이언트 아이디
+            client-name: oauth2-client-app                        # 클라이언트 이름
+            client-secret: ${CLIENT_SECRET}                       # 서비스 공급자에 등록된 클라이언트 비밀번호
+            redirect-uri: "{baseUrl}/login/outh2/code/keycloak"   # 인가서버에서 권한 코드 부여 후 클라이언트로 리다이렉트 하는 위치
+            client-authentication-method: client_secret_post      # 클라이언트 자격증명 전송방식
+            scope: openid, email                                  # 리소스에 접근 제한 범위
+      provider: # 공급자 설정
+        keycloak:
+          authorization-uri: http://localhost:8080/realms/oauth2/protocol/openid-connect/auth  # OAuth 2.0 권한 코드 부여 엔드 포인트
+          issuer-uri: http://localhost:8080/realms/oauth2                                      # 서비스 공급자 위치
+          jwk-set-uri: http://localhost:8080/realms/oauth2/protocol/openid-connect/certs       # OAuth 2.0 JwkSetUri 엔드 포인트
+          token-uri: http://localhost:8080/realms/oauth2/protocol/openid-connect/token         # OAuth 2.0 토큰 엔드 포인트
+          user-info-uri: http://localhost:8080/realms/oauth2/protocol/openid-connect/userinfo  # OAuth 2.0 UserInfo 엔드 포인트
+          user-name-attribute: perferred_username                                              # OAuth 2.0 사용자명을 추출하는 클레임명
+```
+## ClientRegistration
+- OAuth 2.0 또는 OpenID Connect 1.0 Provider에서 클라이언트의 등록 정보를 나타낸다
+- `ClientRegistration`은 OpenID Connect Provider의 설정 엔드포인트나 인가 서버의 메타데이터 엔드포인트를 찾아 초기화할 수 있다.
+
+## ClientRegistrationRepository
+- OAuth 2.0 & OpenID Connect 1.0의 `ClientRegistration` 저장소 역할을 한다.
+- 클라이언트 등록 정보는 궁금적으로 인가 서버가 저장하고 관리하는데 이 레포지토리는 인가 서버에 일차적으로 저장된 클라이언트 등록 정보의 일부를 검색하는 기능을 제공
+- 각 `ClientRegistration` 객체를 `ClientRegistrationRepository` 안에 구성한다.
+- `ClientRegistrationRepository` 기본 구현체는 `InMemoryClientRegistrationRepository`다.
