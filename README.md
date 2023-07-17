@@ -201,7 +201,7 @@ sequenceDiagram
     participant S as Authorization Server
 
     rect rgb(255, 223, 255)
-    note over C, S: front channel
+    
     C->>S: request authorization
     S-->>C: access token
     end
@@ -468,3 +468,52 @@ spring:
 - 클라이언트 등록 정보는 궁금적으로 인가 서버가 저장하고 관리하는데 이 레포지토리는 인가 서버에 일차적으로 저장된 클라이언트 등록 정보의 일부를 검색하는 기능을 제공
 - 각 `ClientRegistration` 객체를 `ClientRegistrationRepository` 안에 구성한다.
 - `ClientRegistrationRepository` 기본 구현체는 `InMemoryClientRegistrationRepository`다.
+
+## oauth2Login()
+OAuth2LoginConfigurer 초기화
+  - `OAuth2LoginAuthenticationFilter`: 
+    - `/login/oauth2/code/*` 요청 처리 필터
+    - Access token 교환 및 사용자 정보 엔드포인트 요청 필터
+  - `OAuth2LoginAuthenticationProvider`: 필터에서 인증을 위임하는 클래스
+  - `OidcAuthorizationCodeAuthenticationProvider`
+  - `DefaultLoginPageGeneratingFilter`: 인증 처리에 필요한 페이지 생성
+  - `OAuth2AuthorizationRequestRedirectFilter`
+    - `/oauth2/authorization/{registrationId}*` 요청 처리
+    - 임시 코드 발급 엔드포인트 요청 필터
+
+### OAuth2UserService
+- 액세스 토큰을 사용해서 UserInfo 엔드포인트 요청으로, 최종 사용자(리소스 소유자)의 속성을 가져오며 `OAuth2User` 타입의 객체를 리턴
+- 구현체로 `DefaultOAuth2UserService`와 `OidcUserService`가 제공된다.
+
+### OAuth2User
+UserAttribute 및 ID Token Claims를 집계 & 구성하여 `OAuth2User`와 `OidcUser` 타입의 클래스를 제공
+- `OAuth2User`
+  - OAuth 2.0 Provider에 연결된 사용자 주체를 나타낸다
+  - 최종 사용자의 인증에 대한 정보인 Attributes를 포함하고 있으며 first name, middle name, last name, ... 등으로 구성된다.
+  - 기본 구현체는 `DefaultOAuth2User`이며 인증 이후 `Authentication`의 `principal` 속성에 저장된다.
+- `OidcUser`
+  - OAUth2User를 상속한 인터페이스이며 OIDC Provider에 연결된 사용자 주체를 나타낸다.
+  - 최종 사용자의 인증에 대한 정보인 Claims를 포함하고 있으며 OidcIdToken 및 OidcUserInfo에서 집계 및 구성된다. 
+  - 기본 구현체는 `DefaultOidcUser`이며 인증 이후 `Authentication`의 `principal` 속성에 저장된다.
+
+```mermaid
+sequenceDiagram
+    participant C as OAuth 2.0 Client
+    participant A as Authorization Server
+    participant O as OpenID Connect
+    
+    C->>A: /userInfo?access_token
+    A-->>C: Attributes(first_name, name, email, ...)
+    note left of C: OAuth2User
+    C->>O: /token?scope=openid
+    O-->>C: Claims, ID Token
+    note left of C: OidcUser
+```
+
+## OAuth 2.0 Provider UserInfo 엔드포인트 요청
+- `DefaultOAuth2UserService`
+  - `loadUser(userRequest: OAuth2UserRequest): OAuth2User`
+- `OAuth2UserRequestEntityConverter`: `OAuth2UserRequest`를 `RequestEntity`로 변환
+- `RestOperations`
+  - `RequestEntity`로 인가서버에 요청하고 `ResponseEntity`로 응답받는다.
+  - `OAuth2User` 타입의 객체를 반환
